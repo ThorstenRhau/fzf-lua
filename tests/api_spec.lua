@@ -25,7 +25,8 @@ T["api"]["fzf_exec"]["table"] = function(multiprocess)
     multiprocess = multiprocess == true,
     __after_open = function()
       child.wait_until_screenshot_text_match("300/300")
-      sleep(100); if not helpers.IS_LINUX() then sleep(250) end
+      sleep(100)
+      if not helpers.IS_LINUX() then sleep(250) end
     end,
   })
 end
@@ -34,74 +35,77 @@ T["api"]["fzf_exec"]["function"] = new_set({ parametrize = { { "sync" }, { "asyn
   function(multiprocess, type)
     if type == "sync" then
       helpers.FzfLua.fzf_exec(child, function(fzf_cb)
-          for i = 1, 1000 do
-            fzf_cb(tostring(i))
-          end
-          fzf_cb(nil)
-        end,
-        { __expect_lines = true, __postprocess_wait = true })
+        for i = 1, 1000 do
+          fzf_cb(tostring(i))
+        end
+        fzf_cb(nil)
+      end, { __expect_lines = true, __postprocess_wait = true }
+      )
     else
       helpers.FzfLua.fzf_exec(child, function(fzf_cb)
-          coroutine.wrap(function()
-            local co = coroutine.running()
-            ---@cast co thread
-            for i = 1, 1000 do
-              fzf_cb(tostring(i), function() coroutine.resume(co) end)
-              coroutine.yield()
-            end
-            fzf_cb(nil)
-          end)()
-        end,
-        { __expect_lines = true, __postprocess_wait = true })
+        coroutine.wrap(function()
+          local co = coroutine.running()
+          ---@cast co thread
+          for i = 1, 1000 do
+            fzf_cb(tostring(i), function() coroutine.resume(co) end)
+            coroutine.yield()
+          end
+          fzf_cb(nil)
+        end)()
+      end, { __expect_lines = true, __postprocess_wait = true }
+      )
     end
   end,
 })
 
 T["api"]["fzf_exec"]["rg"] = new_set({}, {
   function(multiprocess)
-    helpers.FzfLua.fzf_exec(child,
-      "rg --files -g !.git -g !tests/** --sort=path",
-      {
-        __expect_lines = true,
-        -- __postprocess_wait = multiprocess ~= 1,
-        debug = 1,
-        multiprocess = multiprocess,
-      })
-  end
+    helpers.FzfLua.fzf_exec(child, "rg --files -g !.git -g !tests/** --sort=path", {
+      __expect_lines = true,
+      -- __postprocess_wait = multiprocess ~= 1,
+      debug = 1,
+      multiprocess = multiprocess,
+    })
+  end,
 })
 
 T["api"]["fzf_exec"]["fn_transform"] = new_set()
 
+-- fmt: off
 T["api"]["fzf_exec"]["fn_transform"]["filter"] = new_set(
-  { parametrize = { { 0 }, { 13 }, { 24 } } }, {
+  { parametrize = { { 0 }, { 13 }, { 24 } } },
+  {
     function(multiprocess, filter)
       local AND = helpers.IS_WIN() and "&" or "&&"
-      helpers.FzfLua.fzf_exec(child,
-        string.format("echo one%secho two%secho three%secho four", AND, AND, AND),
-        {
-          -- __postprocess_wait = multiprocess ~= 1,
-          __expect_lines = true,
-          multiprocess = multiprocess,
-          fn_transform = filter == 13 and function(item)
-                if vim.tbl_contains({ "one", "three" }, item) then return end
-                return string.format("TRANSFORMED: %s, base64: %s", item, vim.base64.encode(item))
-              end
-              or filter == 24 and function(item)
-                if vim.tbl_contains({ "two", "four" }, item) then return end
-                return string.format("TRANSFORMED: %s, base64: %s", item, vim.base64.encode(item))
-              end
-              or function(item)
-                return string.format("TRANSFORMED: %s, base64: %s", item, vim.base64.encode(item))
-              end
-        })
-    end
-  })
-
+      helpers.FzfLua.fzf_exec(child, string.format(
+        "echo one%secho two%secho three%secho four", AND, AND, AND
+      ), {
+        -- __postprocess_wait = multiprocess ~= 1,
+        __expect_lines = true,
+        multiprocess = multiprocess,
+        fn_transform = filter == 13
+            and function(item)
+              if vim.tbl_contains({ "one", "three" }, item) then return end
+              return string.format("TRANSFORMED: %s, base64: %s", item, vim.base64.encode(item))
+            end or filter == 24
+            and function(item)
+              if vim.tbl_contains({ "two", "four" }, item) then return end
+              return string.format("TRANSFORMED: %s, base64: %s", item, vim.base64.encode(item))
+            end or function(item)
+            return string.format("TRANSFORMED: %s, base64: %s", item, vim.base64.encode(item))
+          end,
+      })
+    end,
+  }
+)
+-- fmt: on
 
 T["api"]["fzf_live"] = new_set({ parametrize = { { true }, { false }, { 1 } } })
 
 T["api"]["fzf_live"]["table"] = function(multiprocess)
-  helpers.FzfLua.fzf_live(child, function(args)
+  helpers.FzfLua.fzf_live(
+    child,
+    function(args)
       local q = args[1]
       if not tonumber(q) then
         return { "Invalid number: " .. tostring(q) }
@@ -121,18 +125,22 @@ T["api"]["fzf_live"]["table"] = function(multiprocess)
         child.wait_until(function() return child.lua_get([[_G._fzf_load_called]]) == true end)
         -- Allow fzf's load event (pos(-1)) to finish updating the UI
         -- before the screenshot is taken.
-        sleep(100); if not helpers.IS_LINUX() then sleep(250) end
+        sleep(100)
+        if not helpers.IS_LINUX() then sleep(250) end
       end,
       query = 100,
       keymap = { fzf = { load = "pos(-1)" } },
       multiprocess = multiprocess == true,
-    })
+    }
+  )
 end
 
 T["api"]["fzf_live"]["function"] = new_set({ parametrize = { { "sync" }, { "async" } } }, {
   function(multiprocess, type)
     if type == "sync" then
-      helpers.FzfLua.fzf_live(child, function(args)
+      helpers.FzfLua.fzf_live(
+        child,
+        function(args)
           local q = args[1]
           return function(fzf_cb)
             if not tonumber(q) then
@@ -154,14 +162,18 @@ T["api"]["fzf_live"]["function"] = new_set({ parametrize = { { "sync" }, { "asyn
             child.wait_until(function() return child.lua_get([[_G._fzf_load_called]]) == true end)
             -- Allow fzf's load event (pos(-1)) to finish updating the UI
             -- before the screenshot is taken.
-            sleep(100); if not helpers.IS_LINUX() then sleep(250) end
+            sleep(100)
+            if not helpers.IS_LINUX() then sleep(250) end
           end,
           query = 100,
           keymap = { fzf = { load = "pos(-1)" } },
           multiprocess = multiprocess == true,
-        })
+        }
+      )
     else
-      helpers.FzfLua.fzf_live(child, function(args)
+      helpers.FzfLua.fzf_live(
+        child,
+        function(args)
           local q = args[1]
           return coroutine.wrap(function(fzf_cb)
             local co = coroutine.running()
@@ -172,7 +184,9 @@ T["api"]["fzf_live"]["function"] = new_set({ parametrize = { { "sync" }, { "asyn
             else
               for i = 1, tonumber(q) do
                 for j, s in ipairs({ "foo", "bar", "baz" }) do
-                  fzf_cb(tostring((i - 1) * 3 + j) .. ": " .. s, function() coroutine.resume(co) end)
+                  fzf_cb(
+                    tostring((i - 1) * 3 + j) .. ": " .. s, function() coroutine.resume(co) end
+                  )
                   coroutine.yield()
                 end
               end
@@ -187,11 +201,13 @@ T["api"]["fzf_live"]["function"] = new_set({ parametrize = { { "sync" }, { "asyn
             child.wait_until(function() return child.lua_get([[_G._fzf_load_called]]) == true end)
             -- Allow fzf's load event (pos(-1)) to finish updating the UI
             -- before the screenshot is taken.
-            sleep(100); if not helpers.IS_LINUX() then sleep(250) end
+            sleep(100)
+            if not helpers.IS_LINUX() then sleep(250) end
           end,
           query = 100,
           keymap = { fzf = { load = "pos(-1)" } },
-        })
+        }
+      )
     end
   end,
 })
@@ -212,30 +228,28 @@ T["api"]["fzf_live"]["rg"]["error"] = new_set({}, {
       end,
       -- fzf_opts = { ["--wrap"] = true },
     })
-  end
+  end,
 })
 
-T["api"]["fzf_live"]["rg"]["no error"] = new_set(
-  { parametrize = { { "[" }, { [[table of cont]] } } },
+T["api"]["fzf_live"]["rg"]["no error"] = new_set({
+  parametrize = { { "[" }, { [[table of cont]] } },
+},
   {
     function(multiprocess, query)
-      helpers.FzfLua.fzf_live(child,
-        string.format(
-          "rg --column --line-number --smart-case --sort=path -g !tests/ -- <query> 2> %s",
-          helpers.IS_WIN() and "nul" or "/dev/null"
-        ),
-        {
-          __expect_lines = true,
-          __after_open = function()
-            child.wait_until(function() return child.lua_get([[_G._fzf_load_called]]) == true end)
-          end,
-          multiprocess = multiprocess,
-          debug = 1,
-          query = query,
-        })
-    end
-  }
-)
+      helpers.FzfLua.fzf_live(child, string.format(
+        "rg --column --line-number --smart-case --sort=path -g !tests/ -- <query> 2> %s",
+        helpers.IS_WIN() and "nul" or "/dev/null"
+      ), {
+        __expect_lines = true,
+        __after_open = function()
+          child.wait_until(function() return child.lua_get([[_G._fzf_load_called]]) == true end)
+        end,
+        multiprocess = multiprocess,
+        debug = 1,
+        query = query,
+      })
+    end,
+  })
 
 T["api"]["fzf_live"]["exec_empty_query"] = function(multiprocess, query)
   helpers.FzfLua.fzf_live(child, "echo <query>", {
@@ -249,94 +263,95 @@ T["api"]["fzf_live"]["exec_empty_query"] = function(multiprocess, query)
   })
 end
 
-T["api"]["events"] = new_set(
-  { parametrize = { { "fzf_exec" }, { "fzf_live" } } },
-  {
-    function(api)
-      local prompt = "EventsPrompt>"
-      helpers.FzfLua[api](child,
-        api == "fzf_exec"
-        and (function() return { "foo", "bar", "baz" } end)()
-        or function() return { "foo", "bar", "baz" } end,
-        {
-          __expect_lines = true,
-          prompt = prompt,
-          exec_empty_query = true,
-          actions = {
-            start = {
-              fn = function(s) _G._fzf_prompt = s[1] end,
-              field_index = helpers.IS_WIN()
+T["api"]["events"] = new_set({ parametrize = { { "fzf_exec" }, { "fzf_live" } } }, {
+  function(api)
+    local prompt = "EventsPrompt>"
+    -- fmt: off
+    helpers.FzfLua[api](child, api == "fzf_exec"
+      and (function() return { "foo", "bar", "baz" } end)()
+      or function() return { "foo", "bar", "baz" } end, {
+      __expect_lines = true,
+      prompt = prompt,
+      exec_empty_query = true,
+      actions = {
+        start = {
+          fn = function(s) _G._fzf_prompt = s[1] end,
+          field_index = helpers.IS_WIN()
                   and "{fzf:prompt}"
                   -- TODO: env vars do not work on Windows in the CI
                   -- they also mess up all other ui_spec tests as lists
                   -- will have the env var output propagated, how??!
                   -- and "%FZF_PROMPT% %FZF_TOTAL_COUNT%"
                   or "$FZF_PROMPT $FZF_TOTAL_COUNT",
-              exec_silent = true,
-            },
-            load = not helpers.IS_WIN() and {
-              fn = function(s) _G._fzf_total_count = tonumber(s[2]) end,
-              field_index = helpers.IS_WIN()
-                  and "%FZF_PROMPT% %FZF_TOTAL_COUNT%"
-                  or "$FZF_PROMPT $FZF_TOTAL_COUNT",
-              exec_silent = true,
-            } or nil,
-          },
-          __after_open = function()
-            child.wait_until(function()
-              return child.lua_get([[_G._fzf_prompt]]) == prompt
-            end)
-            -- See above note in "start" why we skip this on Win
-            if not helpers.IS_WIN() then
-              child.wait_until(function()
-                return child.lua_get([[_G._fzf_total_count]]) == 3
-              end)
-            end
-          end,
-        })
-    end
-  }
-)
+          exec_silent = true,
+        },
+        load = not helpers.IS_WIN()
+          and {
+            fn = function(s) _G._fzf_total_count = tonumber(s[2]) end,
+            field_index = helpers.IS_WIN() and "%FZF_PROMPT% %FZF_TOTAL_COUNT%"
+              or "$FZF_PROMPT $FZF_TOTAL_COUNT",
+            exec_silent = true,
+          } or nil,
+      },
+      __after_open = function()
+        child.wait_until(function()
+          return child.lua_get([[_G._fzf_prompt]]) == prompt
+        end)
+        -- See above note in "start" why we skip this on Win
+        if not helpers.IS_WIN() then
+          child.wait_until(function()
+            return child.lua_get([[_G._fzf_total_count]]) == 3
+          end)
+        end
+      end,
+    })
+    -- fmt: on
+  end,
+})
 
 T["api"]["resume"] = new_set({
   parametrize = { { "fzf_exec" }, { "fzf_live" } },
   n_retry = not helpers.IS_LINUX() and 5 or nil,
-}, {
-  function(api)
-    helpers.FzfLua[api](child, "echo resume string content", {
-      field_index = helpers.IS_WIN() and "" or nil,
-      __expect_lines = false,
-      exec_empty_query = true,
-      debug = 1,
-    })
-    helpers.FzfLua.resume(child, {
-      __expect_lines = true,
-      __after_open = function()
-        sleep(100); if not helpers.IS_LINUX() then sleep(250) end
-      end,
-    })
-
-    helpers.FzfLua[api](child, api == "fzf_exec"
-      and function(fzf_cb)
-        fzf_cb("resume function content")
-        fzf_cb(nil)
-      end or function(_)
-        return function(fzf_cb)
-          fzf_cb("resume function content")
-          fzf_cb(nil)
-        end
-      end, {
+},
+  {
+    function(api)
+      helpers.FzfLua[api](child, "echo resume string content", {
+        field_index = helpers.IS_WIN() and "" or nil,
         __expect_lines = false,
         exec_empty_query = true,
         debug = 1,
       })
-    helpers.FzfLua.resume(child, {
-      __expect_lines = true,
-      __after_open = function()
-        sleep(100); if not helpers.IS_LINUX() then sleep(250) end
-      end,
-    })
-  end,
-})
+      helpers.FzfLua.resume(child, {
+        __expect_lines = true,
+        __after_open = function()
+          sleep(100)
+          if not helpers.IS_LINUX() then sleep(250) end
+        end,
+      })
+
+      helpers.FzfLua[api](child, api == "fzf_exec"
+        and function(fzf_cb)
+          fzf_cb("resume function content")
+          fzf_cb(nil)
+        end
+        or function(_)
+          return function(fzf_cb)
+            fzf_cb("resume function content")
+            fzf_cb(nil)
+          end
+        end, {
+        __expect_lines = false,
+        exec_empty_query = true,
+        debug = 1,
+      })
+      helpers.FzfLua.resume(child, {
+        __expect_lines = true,
+        __after_open = function()
+          sleep(100)
+          if not helpers.IS_LINUX() then sleep(250) end
+        end,
+      })
+    end,
+  })
 
 return T
